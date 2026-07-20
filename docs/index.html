@@ -361,7 +361,7 @@ async function init() {
   document.getElementById("movement-to").value = initialVehicle || CONFIG.VEHICLES[0] || "";
   document.getElementById("movement-from").value = "倉庫";
   const inventoryVehicle = document.getElementById("inventory-vehicle");
-  inventoryVehicle.innerHTML = CONFIG.VEHICLES.map((name) => `<option value="${name}">${name}</option>`).join("");
+  inventoryVehicle.innerHTML = ["倉庫"].concat(CONFIG.VEHICLES).map((name) => `<option value="${name}">${name}</option>`).join("");
   inventoryVehicle.value = initialVehicle || CONFIG.VEHICLES[0] || "";
 
   const list = document.getElementById("change-list");

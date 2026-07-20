@@ -106,12 +106,12 @@ function getLatestReports() {
     const [time, reportId, name, userId, type, item, qty, from, to, vehicle, note] = r;
     if (!item || !type) return;
     const n = Number(qty) || 0;
-    const ensure = (v) => { if (v && v !== "倉庫" && v !== "新規" && v !== "廃棄") { stock[v] = stock[v] || {}; stock[v][item] = Number(stock[v][item] || 0); } };
+    const ensure = (v) => { if (v && v !== "新規" && v !== "廃棄") { stock[v] = stock[v] || {}; stock[v][item] = Number(stock[v][item] || 0); } };
     if (type === "棚卸し") { ensure(vehicle); stock[vehicle][item] = n; }
     if (type === "新規") { ensure(to || vehicle); stock[to || vehicle][item] += n; }
-    if (type === "移動") { ensure(from); ensure(to); if (from && from !== "倉庫" && from !== "新規") stock[from][item] -= n; if (to && to !== "廃棄" && to !== "新規") stock[to][item] += n; }
+    if (type === "移動") { ensure(from); ensure(to); if (from && from !== "新規") stock[from][item] -= n; if (to && to !== "廃棄" && to !== "新規") stock[to][item] += n; }
     if (type === "廃棄") { ensure(from || vehicle); if ((from || vehicle) !== "倉庫") stock[from || vehicle][item] -= n; }
-    const affected = [vehicle, from, to].filter((v) => v && v !== "倉庫" && v !== "新規" && v !== "廃棄");
+    const affected = [vehicle, from, to].filter((v) => v && v !== "新規" && v !== "廃棄");
     affected.forEach((v) => { latest[v] = { vehicle: v, reportId: reportId, time: new Date(time).toISOString(), name: String(name || ""), note: String(note || ""), changeType: type, from: String(from || ""), to: String(to || ""), items: Object.assign({}, stock[v]) }; });
   });
   return Object.keys(stock).sort().map((v) => Object.assign({ vehicle: v, items: stock[v] }, latest[v] || {}));
