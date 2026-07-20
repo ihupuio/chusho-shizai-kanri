@@ -198,26 +198,17 @@
 
   <!-- 入力画面 -->
   <div id="form-screen">
-    <div class="card">
-      <label class="field-label" for="change-type">変更内容</label>
-      <select id="change-type">
-        <option value="new">新規</option>
-        <option value="move">移動</option>
-        <option value="dispose">廃棄</option>
-      </select>
-      <div class="panel-help">今回増減した数を入力してください。</div>
-      <div id="change-list"></div>
-      <button type="button" class="inventory-open" id="inventory-open">棚卸しはこちら</button>
-      <div style="clear:both"></div>
-    </div>
-
-    <div id="route-card" class="card route-card">
+    <div id="route-card" class="card route-card active">
       <label class="field-label">移動ルート</label>
       <div class="route-line">
         <select id="movement-from" aria-label="移動元"></select>
         <span class="route-arrow" aria-hidden="true">→</span>
         <select id="movement-to" aria-label="移動先"></select>
       </div>
+      <div class="panel-help">今回増減した数を入力してください。</div>
+      <div id="change-list"></div>
+      <button type="button" class="inventory-open" id="inventory-open">棚卸しはこちら</button>
+      <div style="clear:both"></div>
     </div>
 
     <div class="card">
@@ -276,11 +267,11 @@ function closeApp() {
 
 async function submitReport() {
   const btn = document.getElementById("submit-btn");
-  const changeType = document.getElementById("change-type").value;
   const note = document.getElementById("note").value.trim();
 
   const from = document.getElementById("movement-from").value;
   const to = document.getElementById("movement-to").value;
+  const changeType = from === "新規" ? "new" : to === "廃棄" ? "dispose" : "move";
   const vehicle = changeType === "dispose" ? from : to;
   const items = {};
   for (let i = 0; i < CONFIG.ITEMS.length; i++) {
@@ -383,7 +374,9 @@ async function init() {
   });
 
   const updateMovementFields = () => {
-    const type = document.getElementById("change-type").value;
+    const from = document.getElementById("movement-from").value;
+    const to = document.getElementById("movement-to").value;
+    const type = from === "新規" ? "new" : to === "廃棄" ? "dispose" : "move";
     const route = document.getElementById("route-card");
     route.classList.add("active");
     const fromEl = document.getElementById("movement-from");
@@ -399,7 +392,8 @@ async function init() {
       toEl.value = "廃棄";
     }
   };
-  document.getElementById("change-type").addEventListener("change", updateMovementFields);
+  document.getElementById("movement-from").addEventListener("change", updateMovementFields);
+  document.getElementById("movement-to").addEventListener("change", updateMovementFields);
   updateMovementFields();
   document.getElementById("inventory-open").addEventListener("click", () => document.getElementById("inventory-modal").classList.add("active"));
   document.getElementById("inventory-cancel").addEventListener("click", () => document.getElementById("inventory-modal").classList.remove("active"));
