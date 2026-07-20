@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>資材ダッシュボード</title>
+<title>資材移動管理</title>
 <script src="config.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -124,6 +124,7 @@
   }
   #history { margin-top: 28px; background: #fff; border: 1px solid #e4e7ec; border-radius: 14px; padding: 16px; overflow-x: auto; }
   #history h2 { font-size: 18px; margin-bottom: 10px; }
+  #vehicle-history { margin-bottom: 18px; }
   #history table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
   #history th, #history td { text-align: left; padding: 8px; border-bottom: 1px solid #eef0f4; }
   #history th { color: #667085; font-weight: 600; }
@@ -132,7 +133,7 @@
 </head>
 <body>
 <header>
-  <h1>🚛 車両別 資材ダッシュボード</h1>
+  <h1>🚛 資材移動管理</h1>
   <span class="demo-badge" id="demo-badge">デモデータ表示中（GAS未設定）</span>
   <span id="status"></span>
 </header>
@@ -140,6 +141,7 @@
 <div id="grid"></div>
 <section id="history">
   <h2>移動履歴</h2>
+  <div id="vehicle-history"><strong id="vehicle-history-title">表示中の車両</strong><div id="vehicle-history-body" class="history-empty">車両を選択してください</div></div>
   <div id="history-body" class="history-empty">まだ履歴はありません</div>
 </section>
 
@@ -164,6 +166,26 @@ function countClass(qty, std) {
   return "plain";
 }
 
+let currentMovements = [];
+
+function historyRows(movements) {
+  return movements.map((m) => {
+    const d = new Date(m.time);
+    const time = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return `<tr><td>${time}</td><td>${m.name || "−"}</td><td>${m.type}</td><td>${m.from || "−"}</td><td>${m.to || "−"}</td><td>${m.item}</td><td>${m.qty}</td></tr>`;
+  }).join("");
+}
+
+function historyTable(movements) {
+  return `<table><thead><tr><th>日時</th><th>報告者</th><th>種別</th><th>移動元</th><th>移動先</th><th>資材</th><th>数量</th></tr></thead><tbody>${historyRows(movements)}</tbody></table>`;
+}
+
+function renderVehicleHistory(vehicle) {
+  const related = currentMovements.filter((m) => m.vehicle === vehicle || m.from === vehicle || m.to === vehicle);
+  document.getElementById("vehicle-history-title").textContent = `${vehicle}の移動履歴`;
+  document.getElementById("vehicle-history-body").innerHTML = related.length ? historyTable(related) : "<div class=\"history-empty\">この車両の履歴はありません</div>";
+}
+
 function render(reports) {
   const byVehicle = {};
   reports.forEach((r) => { byVehicle[r.vehicle] = r; });
@@ -180,6 +202,7 @@ function render(reports) {
     const card = document.createElement("a");
     const t = r ? fmtTime(r.time) : null;
     card.className = "vehicle-card" + (r ? (t && t.stale ? " stale" : "") : " empty");
+    card.dataset.vehicle = v;
     card.href = "index.html?vehicle=" + encodeURIComponent(v);
     card.target = "_blank";
     card.rel = "noopener";
@@ -218,17 +241,21 @@ function render(reports) {
     card.innerHTML = html;
     grid.appendChild(card);
   });
+  const cards = grid.querySelectorAll(".vehicle-card");
+  if (cards.length) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => { if (entry.isIntersecting) renderVehicleHistory(entry.target.dataset.vehicle); });
+    }, { root: grid, threshold: 0.7 });
+    cards.forEach((card) => observer.observe(card));
+    renderVehicleHistory(cards[0].dataset.vehicle);
+  }
 }
 
 function renderHistory(movements) {
+  currentMovements = movements || [];
   const body = document.getElementById("history-body");
   if (!movements || movements.length === 0) { body.textContent = "まだ履歴はありません"; return; }
-  const rows = movements.map((m) => {
-    const d = new Date(m.time);
-    const time = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    return `<tr><td>${time}</td><td>${m.name || "−"}</td><td>${m.type}</td><td>${m.from || "−"}</td><td>${m.to || "−"}</td><td>${m.item}</td><td>${m.qty}</td></tr>`;
-  }).join("");
-  body.innerHTML = `<table><thead><tr><th>日時</th><th>報告者</th><th>種別</th><th>移動元</th><th>移動先</th><th>資材</th><th>数量</th></tr></thead><tbody>${rows}</tbody></table>`;
+  body.innerHTML = historyTable(movements);
 }
 
 function demoData() {
@@ -268,8 +295,8 @@ async function refresh() {
     const res = await fetch(CONFIG.GAS_URL + "?t=" + Date.now());
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || "サーバーエラー");
-    render(json.vehicles || []);
     renderHistory(json.movements || []);
+    render(json.vehicles || []);
     errBar.style.display = "none";
     const now = new Date();
     status.textContent = "最終更新 " +

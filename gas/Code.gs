@@ -137,7 +137,7 @@ function getMovementHistory() {
     .filter((r) => r[4] && r[4] !== "棚卸し")
     .sort((a, b) => new Date(b[0]) - new Date(a[0]))
     .slice(0, 100)
-    .map((r) => ({ time: new Date(r[0]).toISOString(), type: String(r[4]), item: String(r[5]), qty: Number(r[6]), from: String(r[7] || ""), to: String(r[8] || ""), name: String(r[2] || "") }));
+    .map((r) => ({ time: new Date(r[0]).toISOString(), type: String(r[4]), item: String(r[5]), qty: Number(r[6]), from: String(r[7] || ""), to: String(r[8] || ""), vehicle: String(r[9] || ""), name: String(r[2] || "") }));
 }
 
 // 記録シートから車両ごとの最新報告を組み立てる
