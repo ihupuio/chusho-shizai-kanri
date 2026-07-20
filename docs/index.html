@@ -17,6 +17,19 @@
   .container { max-width: 480px; margin: 0 auto; padding: 16px; }
   header { text-align: center; padding: 12px 0 4px; }
   header h1 { font-size: 20px; }
+  .dashboard-link {
+    display: inline-block;
+    margin-top: 8px;
+    color: #1570ef;
+    font-size: 13px;
+    text-decoration: none;
+  }
+  .dashboard-link:hover { text-decoration: underline; }
+  .dashboard-link:focus-visible {
+    outline: 2px solid #1570ef;
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
   #user-name {
     text-align: center;
     font-size: 13px;
@@ -130,7 +143,10 @@
 </head>
 <body>
 <div class="container">
-  <header><h1>🚛 終業前 資材報告</h1></header>
+  <header>
+    <h1>🚛 終業前 資材報告</h1>
+    <a class="dashboard-link" href="dashboard.html" target="_blank" rel="noopener">ダッシュボードを見る</a>
+  </header>
   <div id="user-name"></div>
   <div class="demo-badge" id="demo-badge">デモモード（LIFF未設定）</div>
   <div id="error-msg"></div>
