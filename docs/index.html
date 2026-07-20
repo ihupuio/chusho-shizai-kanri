@@ -120,9 +120,14 @@
     font-size: 12px;
     margin-bottom: 4px;
   }
-  .movement-fields { display: none; margin-top: 12px; }
+  .movement-fields { display: none; }
   .movement-fields.active { display: block; }
   .movement-fields label { display: block; font-size: 12px; color: #667085; margin: 8px 0 4px; }
+  .route-card { display: none; }
+  .route-card.active { display: block; }
+  .route-line { display: flex; align-items: center; gap: 8px; }
+  .route-line select { flex: 1; min-width: 0; }
+  .route-arrow { font-size: 22px; color: #667085; flex: none; }
   .inventory-open { float: right; border: none; background: none; color: #1570ef; font-size: 12px; padding: 4px 0; }
   .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(16,24,40,.45); z-index: 10; padding: 24px 16px; }
   .modal-backdrop.active { display: block; }
@@ -198,6 +203,15 @@
       <select id="vehicle"></select>
     </div>
 
+    <div id="route-card" class="card route-card">
+      <label class="field-label">移動ルート</label>
+      <div class="route-line">
+        <select id="movement-from" aria-label="移動元"></select>
+        <span class="route-arrow" aria-hidden="true">→</span>
+        <select id="movement-to" aria-label="移動先"></select>
+      </div>
+    </div>
+
     <div class="card">
       <label class="field-label" for="change-type">変更内容</label>
       <select id="change-type">
@@ -207,12 +221,6 @@
       </select>
       <div class="panel-help">今回増減した数を入力してください。</div>
       <div id="change-list"></div>
-      <div id="movement-fields" class="movement-fields">
-        <label for="movement-from">移動元</label>
-        <select id="movement-from"></select>
-        <label for="movement-to">移動先</label>
-        <select id="movement-to"></select>
-      </div>
       <button type="button" class="inventory-open" id="inventory-open">棚卸しはこちら</button>
       <div style="clear:both"></div>
     </div>
@@ -386,11 +394,20 @@ async function init() {
 
   const updateMovementFields = () => {
     const type = document.getElementById("change-type").value;
-    const fields = document.getElementById("movement-fields");
-    fields.classList.toggle("active", type !== "new");
-    document.getElementById("movement-from").disabled = type === "new";
-    document.getElementById("movement-to").disabled = type !== "move";
-    if (type === "dispose") document.getElementById("movement-from").value = document.getElementById("vehicle").value;
+    const route = document.getElementById("route-card");
+    route.classList.add("active");
+    const fromEl = document.getElementById("movement-from");
+    const toEl = document.getElementById("movement-to");
+    fromEl.disabled = type !== "move";
+    toEl.disabled = type !== "move";
+    if (type === "new") {
+      fromEl.value = "倉庫";
+      toEl.value = document.getElementById("vehicle").value;
+    }
+    if (type === "dispose") {
+      fromEl.value = document.getElementById("vehicle").value;
+      toEl.value = "廃棄";
+    }
   };
   document.getElementById("change-type").addEventListener("change", updateMovementFields);
   document.getElementById("vehicle").addEventListener("change", updateMovementFields);
