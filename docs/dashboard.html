@@ -142,7 +142,6 @@
 <section id="history">
   <h2>移動履歴</h2>
   <div id="vehicle-history"><strong id="vehicle-history-title">表示中の車両</strong><div id="vehicle-history-body" class="history-empty">車両を選択してください</div></div>
-  <div id="history-body" class="history-empty">まだ履歴はありません</div>
 </section>
 
 <script>
@@ -253,9 +252,6 @@ function render(reports) {
 
 function renderHistory(movements) {
   currentMovements = movements || [];
-  const body = document.getElementById("history-body");
-  if (!movements || movements.length === 0) { body.textContent = "まだ履歴はありません"; return; }
-  body.innerHTML = historyTable(movements);
 }
 
 function demoData() {
