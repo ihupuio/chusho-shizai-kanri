@@ -198,15 +198,6 @@
 
   <!-- 入力画面 -->
   <div id="form-screen">
-    <div id="route-card" class="card route-card">
-      <label class="field-label">移動ルート</label>
-      <div class="route-line">
-        <select id="movement-from" aria-label="移動元"></select>
-        <span class="route-arrow" aria-hidden="true">→</span>
-        <select id="movement-to" aria-label="移動先"></select>
-      </div>
-    </div>
-
     <div class="card">
       <label class="field-label" for="change-type">変更内容</label>
       <select id="change-type">
@@ -218,6 +209,15 @@
       <div id="change-list"></div>
       <button type="button" class="inventory-open" id="inventory-open">棚卸しはこちら</button>
       <div style="clear:both"></div>
+    </div>
+
+    <div id="route-card" class="card route-card">
+      <label class="field-label">移動ルート</label>
+      <div class="route-line">
+        <select id="movement-from" aria-label="移動元"></select>
+        <span class="route-arrow" aria-hidden="true">→</span>
+        <select id="movement-to" aria-label="移動先"></select>
+      </div>
     </div>
 
     <div class="card">
@@ -388,8 +388,8 @@ async function init() {
     route.classList.add("active");
     const fromEl = document.getElementById("movement-from");
     const toEl = document.getElementById("movement-to");
-    fromEl.disabled = type !== "move";
-    toEl.disabled = type !== "move";
+    fromEl.disabled = type === "new";
+    toEl.disabled = type === "dispose";
     if (type === "new") {
       fromEl.value = "新規";
       toEl.value = toEl.value === "倉庫" || toEl.value === "廃棄" ? (initialVehicle || CONFIG.VEHICLES[0] || "") : toEl.value;
