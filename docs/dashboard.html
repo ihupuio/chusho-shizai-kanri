@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資材ダッシュボード</title>
+<script src="config.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+    background: #eef0f4;
+    color: #1a1a1a;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  header h1 { font-size: 22px; }
+  #status { font-size: 13px; color: #667085; }
+  .demo-badge {
+    display: none;
+    background: #fff3cd;
+    color: #92400e;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .vehicle-card {
+    display: block;
+    background: #fff;
+    border: 1px solid #e4e7ec;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(16,24,40,.06);
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+  .vehicle-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(16,24,40,.10);
+  }
+  .vehicle-card:focus-visible {
+    outline: 3px solid #1570ef;
+    outline-offset: 3px;
+  }
+  .vehicle-card.stale { border-color: #f0c95c; }
+  .vehicle-card.empty { opacity: .6; background: #f7f8fa; }
+  .v-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .v-head .truck { font-size: 24px; }
+  .v-head .v-name { font-size: 18px; font-weight: 700; }
+  .v-meta { font-size: 12px; color: #667085; margin-bottom: 12px; min-height: 16px; }
+  .v-meta .warn { color: #b54708; font-weight: 600; }
+  .item-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #eef0f4;
+    font-size: 14px;
+  }
+  .item-line:last-child { border-bottom: none; }
+  .count {
+    min-width: 52px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 15px;
+    border-radius: 8px;
+    padding: 3px 8px;
+  }
+  .count.ok    { background: #e7f6ef; color: #12805c; }
+  .count.low   { background: #fdf1dc; color: #b54708; }
+  .count.zero  { background: #fdeceb; color: #b42318; }
+  .count.plain { background: #f2f4f7; color: #475467; }
+  .count small { font-weight: 400; font-size: 11px; opacity: .7; }
+  .no-report { text-align: center; color: #98a2b3; font-size: 13px; padding: 24px 0; }
+  /* 資材が1品目のときの大きな数字表示 */
+  .big-count { text-align: center; padding: 8px 0 4px; }
+  .big-count .item-title { font-size: 13px; color: #667085; margin-bottom: 6px; }
+  .big-count .num { font-size: 52px; font-weight: 800; line-height: 1; }
+  .big-count .num small { font-size: 18px; font-weight: 400; opacity: .6; }
+  .big-count .num.ok   { color: #12805c; }
+  .big-count .num.low  { color: #d97706; }
+  .big-count .num.zero { color: #d92d20; }
+  .big-count .num.plain{ color: #475467; }
+  /* スマホ：横スワイプで1台ずつ全車見られる */
+  @media (max-width: 700px) {
+    body { padding: 16px 0 16px 16px; }
+    #grid {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      gap: 12px;
+      padding-right: 16px;
+      padding-bottom: 8px;
+    }
+    .vehicle-card {
+      flex: 0 0 76%;
+      scroll-snap-align: center;
+    }
+    header { padding-right: 16px; }
+  }
+  #error-bar {
+    display: none;
+    background: #fdeceb;
+    color: #b42318;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚛 車両別 資材ダッシュボード</h1>
+  <span class="demo-badge" id="demo-badge">デモデータ表示中（GAS未設定）</span>
+  <span id="status"></span>
+</header>
+<div id="error-bar"></div>
+<div id="grid"></div>
+
+<script>
+function fmtTime(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d)) return null;
+  const now = new Date();
+  const sameDay = (a, b) => a.toDateString() === b.toDateString();
+  const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  if (sameDay(d, now)) return { text: "今日 " + hm, stale: false };
+  const yest = new Date(now); yest.setDate(now.getDate() - 1);
+  if (sameDay(d, yest)) return { text: "昨日 " + hm, stale: true };
+  return { text: (d.getMonth() + 1) + "/" + d.getDate() + " " + hm, stale: true };
+}
+
+function countClass(qty, std) {
+  if (qty === 0) return "zero";
+  if (std > 0 && qty < std) return "low";
+  if (std > 0) return "ok";
+  return "plain";
+}
+
+function render(reports) {
+  const byVehicle = {};
+  reports.forEach((r) => { byVehicle[r.vehicle] = r; });
+
+  // config記載の車両を順に表示し、config外の車両（過去データ等）も後ろに足す
+  const vehicles = CONFIG.VEHICLES.slice();
+  Object.keys(byVehicle).forEach((v) => { if (!vehicles.includes(v)) vehicles.push(v); });
+
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  vehicles.forEach((v) => {
+    const r = byVehicle[v];
+    const card = document.createElement("a");
+    const t = r ? fmtTime(r.time) : null;
+    card.className = "vehicle-card" + (r ? (t && t.stale ? " stale" : "") : " empty");
+    card.href = "index.html?vehicle=" + encodeURIComponent(v);
+    card.target = "_blank";
+    card.rel = "noopener";
+    card.setAttribute("aria-label", v + "の資材報告フォームを開く");
+    card.title = v + "の報告フォームを開く";
+
+    let html =
+      `<div class="v-head"><span class="truck">🚛</span><span class="v-name">${v}</span></div>`;
+
+    if (!r) {
+      html += `<div class="v-meta"></div><div class="no-report">報告なし</div>`;
+    } else {
+      html += `<div class="v-meta">` +
+        (t ? `<span class="${t.stale ? "warn" : ""}">${t.stale ? "⚠ " : ""}${t.text}</span>` : "") +
+        (r.name ? `　${r.name}` : "") + `</div>`;
+      if (CONFIG.ITEMS.length === 1) {
+        // 1品目だけなら数字を大きく表示
+        const it = CONFIG.ITEMS[0];
+        const qty = (r.items && it.name in r.items) ? Number(r.items[it.name]) : null;
+        const cls = qty === null ? "plain" : countClass(qty, it.std);
+        const stdLabel = it.std > 0 ? `<small> / ${it.std}</small>` : "";
+        html += `<div class="big-count"><div class="item-title">${it.name}</div>` +
+          `<div class="num ${cls}">${qty === null ? "−" : qty}${stdLabel}</div></div>`;
+      } else {
+        CONFIG.ITEMS.forEach((it) => {
+          const qty = (r.items && it.name in r.items) ? Number(r.items[it.name]) : null;
+          const cls = qty === null ? "plain" : countClass(qty, it.std);
+          const stdLabel = it.std > 0 ? `<small>/${it.std}</small>` : "";
+          html += `<div class="item-line"><span>${it.name}</span>` +
+            `<span class="count ${cls}">${qty === null ? "−" : qty}${stdLabel}</span></div>`;
+        });
+      }
+    }
+    card.innerHTML = html;
+    grid.appendChild(card);
+  });
+}
+
+function demoData() {
+  // config.jsの車両・資材リストからデモ用の報告データを作る
+  // （定数どおり／不足／ゼロ／昨日報告、を順番に混ぜる。最後の車両は未報告のまま残す）
+  const today = new Date();
+  const yest = new Date(today); yest.setDate(today.getDate() - 1);
+  const names = ["佐藤", "鈴木", "高橋", "田中", "伊藤", "渡辺"];
+  const qtyPattern = (std, i) => [std, Math.max(0, std - 1), 0, std + 1][i % 4];
+
+  return CONFIG.VEHICLES.slice(0, Math.max(1, CONFIG.VEHICLES.length - 1)).map((v, i) => {
+    const items = {};
+    CONFIG.ITEMS.forEach((it, j) => {
+      items[it.name] = qtyPattern(it.std || 2, i + j);
+    });
+    return {
+      vehicle: v,
+      name: names[i % names.length],
+      time: (i === 2 ? yest : today).toISOString(),
+      items: items,
+    };
+  });
+}
+
+async function refresh() {
+  const status = document.getElementById("status");
+  const errBar = document.getElementById("error-bar");
+
+  if (!CONFIG.GAS_URL) {
+    document.getElementById("demo-badge").style.display = "inline-block";
+    render(demoData());
+    status.textContent = "";
+    return;
+  }
+
+  try {
+    const res = await fetch(CONFIG.GAS_URL + "?t=" + Date.now());
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "サーバーエラー");
+    render(json.vehicles || []);
+    errBar.style.display = "none";
+    const now = new Date();
+    status.textContent = "最終更新 " +
+      String(now.getHours()).padStart(2, "0") + ":" +
+      String(now.getMinutes()).padStart(2, "0") + ":" +
+      String(now.getSeconds()).padStart(2, "0") +
+      `（${CONFIG.REFRESH_SEC}秒ごとに自動更新）`;
+  } catch (e) {
+    errBar.textContent = "データ取得に失敗しました：" + e.message;
+    errBar.style.display = "block";
+  }
+}
+
+refresh();
+setInterval(refresh, (CONFIG.REFRESH_SEC || 30) * 1000);
+</script>
+</body>
+</html>

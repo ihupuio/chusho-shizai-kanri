@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>資材報告</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="config.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+    background: #f2f4f7;
+    color: #1a1a1a;
+    min-height: 100vh;
+  }
+  .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+  header { text-align: center; padding: 12px 0 4px; }
+  header h1 { font-size: 20px; }
+  #user-name {
+    text-align: center;
+    font-size: 13px;
+    color: #667085;
+    margin-bottom: 12px;
+    min-height: 18px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(16,24,40,.08);
+  }
+  label.field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #344054;
+    margin-bottom: 6px;
+  }
+  select, textarea {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1.5px solid #d0d5dd;
+    border-radius: 10px;
+    background: #fff;
+    appearance: auto;
+  }
+  textarea { resize: none; height: 56px; }
+  /* 資材ごとの数量行 */
+  .item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eaecf0;
+  }
+  .item-row:last-child { border-bottom: none; }
+  .item-name { flex: 1; font-size: 15px; font-weight: 600; }
+  .item-std { font-size: 11px; color: #98a2b3; font-weight: 400; display: block; }
+  .item-row button {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+    font-weight: 700;
+    border: 1.5px solid #d0d5dd;
+    border-radius: 10px;
+    background: #fff;
+    color: #344054;
+    flex: none;
+  }
+  .item-row input {
+    width: 60px;
+    height: 44px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    border: 1.5px solid #d0d5dd;
+    border-radius: 10px;
+    flex: none;
+  }
+  #submit-btn {
+    width: 100%;
+    padding: 16px 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    background: #06c755;
+    border: none;
+    border-radius: 12px;
+    margin-top: 4px;
+  }
+  #submit-btn:disabled { background: #a8d5bc; }
+  /* 完了画面 */
+  #done-screen { display: none; text-align: center; padding-top: 48px; }
+  #done-screen .check { font-size: 56px; }
+  #done-screen h2 { font-size: 20px; margin: 12px 0 8px; }
+  #done-detail { color: #667085; font-size: 15px; margin-bottom: 32px; white-space: pre-line; }
+  #done-screen button {
+    display: block;
+    width: 100%;
+    padding: 15px 0;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  #close-btn { background: #06c755; color: #fff; border: none; }
+  #error-msg {
+    display: none;
+    background: #fdeceb;
+    color: #b42318;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  .demo-badge {
+    display: none;
+    text-align: center;
+    background: #fff8e1;
+    color: #92400e;
+    font-size: 12px;
+    padding: 6px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header><h1>🚛 終業前 資材報告</h1></header>
+  <div id="user-name"></div>
+  <div class="demo-badge" id="demo-badge">デモモード（LIFF未設定）</div>
+  <div id="error-msg"></div>
+
+  <!-- 入力画面 -->
+  <div id="form-screen">
+    <div class="card">
+      <label class="field-label" for="vehicle">車両</label>
+      <select id="vehicle"></select>
+    </div>
+
+    <div class="card">
+      <label class="field-label">車両に積んでいる資材の数</label>
+      <div id="item-list"></div>
+    </div>
+
+    <div class="card">
+      <label class="field-label" for="note">備考（任意）</label>
+      <textarea id="note" placeholder="例：1本使い切ったため残りわずか"></textarea>
+    </div>
+
+    <button id="submit-btn" onclick="submitReport()">この内容で報告する</button>
+  </div>
+
+  <!-- 完了画面 -->
+  <div id="done-screen">
+    <div class="check">✅</div>
+    <h2>報告しました</h2>
+    <div id="done-detail"></div>
+    <button id="close-btn" onclick="closeApp()">閉じる</button>
+  </div>
+</div>
+
+<script>
+let profile = { displayName: "", userId: "" };
+
+function showError(msg) {
+  const el = document.getElementById("error-msg");
+  el.textContent = msg;
+  el.style.display = "block";
+  window.scrollTo(0, 0);
+}
+
+function step(idx, d) {
+  const el = document.getElementById("qty-" + idx);
+  el.value = Math.max(0, (parseInt(el.value, 10) || 0) + d);
+}
+
+function closeApp() {
+  if (window.liff && liff.isInClient && liff.isInClient()) {
+    liff.closeWindow();
+  } else {
+    document.getElementById("done-detail").textContent = "このままブラウザを閉じてください";
+  }
+}
+
+async function submitReport() {
+  const btn = document.getElementById("submit-btn");
+  const vehicle = document.getElementById("vehicle").value;
+  const note = document.getElementById("note").value.trim();
+
+  const items = {};
+  for (let i = 0; i < CONFIG.ITEMS.length; i++) {
+    const v = parseInt(document.getElementById("qty-" + i).value, 10);
+    if (isNaN(v) || v < 0) {
+      showError(`「${CONFIG.ITEMS[i].name}」の数量を確認してください`);
+      return;
+    }
+    items[CONFIG.ITEMS[i].name] = v;
+  }
+  if (!vehicle) { showError("車両を選択してください"); return; }
+  if (!CONFIG.GAS_URL) { showError("GAS_URLが未設定です（config.js）"); return; }
+
+  document.getElementById("error-msg").style.display = "none";
+  btn.disabled = true;
+  btn.textContent = "送信中…";
+
+  try {
+    const res = await fetch(CONFIG.GAS_URL, {
+      method: "POST",
+      body: JSON.stringify({  // ヘッダー無し(text/plain)でCORSプリフライトを回避
+        name: profile.displayName,
+        userId: profile.userId,
+        vehicle: vehicle,
+        items: items,
+        note: note,
+      }),
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "サーバーエラー");
+
+    localStorage.setItem("lastVehicle", vehicle);
+    document.getElementById("done-detail").textContent =
+      vehicle + "\n" +
+      CONFIG.ITEMS.map((it) => `${it.name}：${items[it.name]}`).join("　");
+    document.getElementById("form-screen").style.display = "none";
+    document.getElementById("done-screen").style.display = "block";
+    window.scrollTo(0, 0);
+  } catch (e) {
+    showError("送信に失敗しました。電波の良い場所で再度お試しください。（" + e.message + "）");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "この内容で報告する";
+  }
+}
+
+async function init() {
+  // 車両リスト（前回選んだ車両を初期選択）
+  const sel = document.getElementById("vehicle");
+  const last = localStorage.getItem("lastVehicle");
+  const requestedVehicle = new URLSearchParams(window.location.search).get("vehicle");
+  const initialVehicle = CONFIG.VEHICLES.includes(requestedVehicle) ? requestedVehicle : last;
+  CONFIG.VEHICLES.forEach((name) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    if (name === initialVehicle) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  // 資材ごとの数量入力行
+  const list = document.getElementById("item-list");
+  CONFIG.ITEMS.forEach((it, i) => {
+    const row = document.createElement("div");
+    row.className = "item-row";
+    row.innerHTML =
+      `<div class="item-name">${it.name}` +
+      (it.std > 0 ? `<span class="item-std">定数 ${it.std}</span>` : "") +
+      `</div>` +
+      `<button type="button" onclick="step(${i},-1)">−</button>` +
+      `<input type="number" id="qty-${i}" value="0" min="0" inputmode="numeric">` +
+      `<button type="button" onclick="step(${i},1)">＋</button>`;
+    list.appendChild(row);
+  });
+
+  if (!CONFIG.LIFF_ID) {
+    // デモモード：LINEなしで動作確認用
+    document.getElementById("demo-badge").style.display = "block";
+    profile = { displayName: "テストユーザー", userId: "demo" };
+    document.getElementById("user-name").textContent = "報告者：" + profile.displayName;
+    return;
+  }
+
+  try {
+    await liff.init({ liffId: CONFIG.LIFF_ID });
+    if (!liff.isLoggedIn()) {
+      liff.login();  // LINEアプリ内なら自動ログイン、外部ブラウザならログイン画面へ
+      return;
+    }
+    const p = await liff.getProfile();
+    profile = { displayName: p.displayName, userId: p.userId };
+    document.getElementById("user-name").textContent = "報告者：" + profile.displayName;
+  } catch (e) {
+    showError("LIFFの初期化に失敗しました：" + e.message);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
