@@ -93,6 +93,33 @@
     border-radius: 10px;
     flex: none;
   }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 8px;
+    border: 1.5px solid #d0d5dd;
+    border-radius: 10px;
+    background: #fff;
+    color: #475467;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .tab-btn.active {
+    border-color: #1570ef;
+    background: #eff8ff;
+    color: #175cd3;
+  }
+  .item-panel { display: none; }
+  .item-panel.active { display: block; }
+  .panel-help {
+    color: #667085;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
   #submit-btn {
     width: 100%;
     padding: 16px 0;
@@ -160,7 +187,18 @@
 
     <div class="card">
       <label class="field-label">車両に積んでいる資材の数</label>
-      <div id="item-list"></div>
+      <div class="tabs" role="tablist" aria-label="資材入力の種類">
+        <button type="button" class="tab-btn active" data-panel="inventory-panel" role="tab" aria-selected="true">棚卸し（現在庫）</button>
+        <button type="button" class="tab-btn" data-panel="load-panel" role="tab" aria-selected="false">新たに積んだ数</button>
+      </div>
+      <div id="inventory-panel" class="item-panel active" role="tabpanel">
+        <div class="panel-help">車両に現在ある数を入力してください。</div>
+        <div id="inventory-list"></div>
+      </div>
+      <div id="load-panel" class="item-panel" role="tabpanel">
+        <div class="panel-help">今回、新たに積み込んだ数を入力してください。棚卸し数に加算されます。</div>
+        <div id="load-list"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -190,8 +228,8 @@ function showError(msg) {
   window.scrollTo(0, 0);
 }
 
-function step(idx, d) {
-  const el = document.getElementById("qty-" + idx);
+function step(kind, idx, d) {
+  const el = document.getElementById(kind + "-qty-" + idx);
   el.value = Math.max(0, (parseInt(el.value, 10) || 0) + d);
 }
 
@@ -208,14 +246,19 @@ async function submitReport() {
   const vehicle = document.getElementById("vehicle").value;
   const note = document.getElementById("note").value.trim();
 
+  const inventory = {};
+  const loaded = {};
   const items = {};
   for (let i = 0; i < CONFIG.ITEMS.length; i++) {
-    const v = parseInt(document.getElementById("qty-" + i).value, 10);
-    if (isNaN(v) || v < 0) {
+    const stock = parseInt(document.getElementById("inventory-qty-" + i).value, 10);
+    const load = parseInt(document.getElementById("load-qty-" + i).value, 10);
+    if (isNaN(stock) || stock < 0 || isNaN(load) || load < 0) {
       showError(`「${CONFIG.ITEMS[i].name}」の数量を確認してください`);
       return;
     }
-    items[CONFIG.ITEMS[i].name] = v;
+    inventory[CONFIG.ITEMS[i].name] = stock;
+    loaded[CONFIG.ITEMS[i].name] = load;
+    items[CONFIG.ITEMS[i].name] = stock + load;
   }
   if (!vehicle) { showError("車両を選択してください"); return; }
   if (!CONFIG.GAS_URL) { showError("GAS_URLが未設定です（config.js）"); return; }
@@ -241,7 +284,7 @@ async function submitReport() {
     localStorage.setItem("lastVehicle", vehicle);
     document.getElementById("done-detail").textContent =
       vehicle + "\n" +
-      CONFIG.ITEMS.map((it) => `${it.name}：${items[it.name]}`).join("　");
+      CONFIG.ITEMS.map((it) => `${it.name}：${items[it.name]}（棚卸し${inventory[it.name]}＋積込${loaded[it.name]}）`).join("　");
     document.getElementById("form-screen").style.display = "none";
     document.getElementById("done-screen").style.display = "block";
     window.scrollTo(0, 0);
@@ -267,19 +310,33 @@ async function init() {
     sel.appendChild(opt);
   });
 
-  // 資材ごとの数量入力行
-  const list = document.getElementById("item-list");
-  CONFIG.ITEMS.forEach((it, i) => {
-    const row = document.createElement("div");
-    row.className = "item-row";
-    row.innerHTML =
-      `<div class="item-name">${it.name}` +
-      (it.std > 0 ? `<span class="item-std">定数 ${it.std}</span>` : "") +
-      `</div>` +
-      `<button type="button" onclick="step(${i},-1)">−</button>` +
-      `<input type="number" id="qty-${i}" value="0" min="0" inputmode="numeric">` +
-      `<button type="button" onclick="step(${i},1)">＋</button>`;
-    list.appendChild(row);
+  // 棚卸し・積み込みの数量入力行
+  ["inventory", "load"].forEach((kind) => {
+    const list = document.getElementById(kind + "-list");
+    CONFIG.ITEMS.forEach((it, i) => {
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.innerHTML =
+        `<div class="item-name">${it.name}` +
+        (it.std > 0 ? `<span class="item-std">定数 ${it.std}</span>` : "") +
+        `</div>` +
+        `<button type="button" onclick="step('${kind}',${i},-1)">−</button>` +
+        `<input type="number" id="${kind}-qty-${i}" value="0" min="0" inputmode="numeric">` +
+        `<button type="button" onclick="step('${kind}',${i},1)">＋</button>`;
+      list.appendChild(row);
+    });
+  });
+
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach((b) => {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
+      document.querySelectorAll(".item-panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.id === btn.dataset.panel);
+      });
+    });
   });
 
   if (!CONFIG.LIFF_ID) {
