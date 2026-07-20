@@ -16,6 +16,9 @@
 
 const SHEET_RECORD = "記録";
 const SHEET_LATEST = "最新";
+const SHEET_WORKERS = "作業者マスタ";
+const SHEET_VEHICLES = "車両マスタ";
+const INITIAL_VEHICLES = ["3620", "4078", "4079", "4913", "4914", "5433", "1552"];
 
 // 初期セットアップ：シートを作る
 function setup() {
@@ -32,6 +35,21 @@ function setup() {
   if (!ss.getSheetByName(SHEET_LATEST)) {
     const latest = ss.insertSheet(SHEET_LATEST);
     latest.getRange(1, 1).setValue("（報告が届くとここに車両×資材の最新表が自動生成されます）");
+  }
+
+  if (!ss.getSheetByName(SHEET_WORKERS)) {
+    const workers = ss.insertSheet(SHEET_WORKERS);
+    workers.getRange(1, 1, 1, 3).setValues([["氏名", "LINE表示名", "有効"]]);
+    workers.setFrozenRows(1);
+  }
+
+  if (!ss.getSheetByName(SHEET_VEHICLES)) {
+    const vehicles = ss.insertSheet(SHEET_VEHICLES);
+    vehicles.getRange(1, 1, 1, 3).setValues([["号車番号", "状態", "表示順"]]);
+    vehicles.getRange(2, 1, INITIAL_VEHICLES.length, 3).setValues(
+      INITIAL_VEHICLES.map((v, i) => [v, "使用中", i + 1])
+    );
+    vehicles.setFrozenRows(1);
   }
 }
 
