@@ -226,9 +226,9 @@ function renderHistory(movements) {
   const rows = movements.map((m) => {
     const d = new Date(m.time);
     const time = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    return `<tr><td>${time}</td><td>${m.type}</td><td>${m.from || "−"}</td><td>${m.to || "−"}</td><td>${m.item}</td><td>${m.qty}</td></tr>`;
+    return `<tr><td>${time}</td><td>${m.name || "−"}</td><td>${m.type}</td><td>${m.from || "−"}</td><td>${m.to || "−"}</td><td>${m.item}</td><td>${m.qty}</td></tr>`;
   }).join("");
-  body.innerHTML = `<table><thead><tr><th>日時</th><th>種別</th><th>移動元</th><th>移動先</th><th>資材</th><th>数量</th></tr></thead><tbody>${rows}</tbody></table>`;
+  body.innerHTML = `<table><thead><tr><th>日時</th><th>報告者</th><th>種別</th><th>移動元</th><th>移動先</th><th>資材</th><th>数量</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function demoData() {
