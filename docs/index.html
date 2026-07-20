@@ -381,7 +381,7 @@ async function init() {
     route.classList.add("active");
     const fromEl = document.getElementById("movement-from");
     const toEl = document.getElementById("movement-to");
-    fromEl.disabled = type === "new";
+    fromEl.disabled = false;
     toEl.disabled = type === "dispose";
     if (type === "new") {
       fromEl.value = "新規";
