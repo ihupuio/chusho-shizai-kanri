@@ -122,6 +122,12 @@
     font-size: 14px;
     margin-bottom: 16px;
   }
+  #history { margin-top: 28px; background: #fff; border: 1px solid #e4e7ec; border-radius: 14px; padding: 16px; overflow-x: auto; }
+  #history h2 { font-size: 18px; margin-bottom: 10px; }
+  #history table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+  #history th, #history td { text-align: left; padding: 8px; border-bottom: 1px solid #eef0f4; }
+  #history th { color: #667085; font-weight: 600; }
+  .history-empty { color: #98a2b3; padding: 8px 0; }
 </style>
 </head>
 <body>
@@ -132,6 +138,10 @@
 </header>
 <div id="error-bar"></div>
 <div id="grid"></div>
+<section id="history">
+  <h2>移動履歴</h2>
+  <div id="history-body" class="history-empty">まだ履歴はありません</div>
+</section>
 
 <script>
 function fmtTime(iso) {
@@ -210,6 +220,17 @@ function render(reports) {
   });
 }
 
+function renderHistory(movements) {
+  const body = document.getElementById("history-body");
+  if (!movements || movements.length === 0) { body.textContent = "まだ履歴はありません"; return; }
+  const rows = movements.map((m) => {
+    const d = new Date(m.time);
+    const time = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return `<tr><td>${time}</td><td>${m.type}</td><td>${m.from || "−"}</td><td>${m.to || "−"}</td><td>${m.item}</td><td>${m.qty}</td></tr>`;
+  }).join("");
+  body.innerHTML = `<table><thead><tr><th>日時</th><th>種別</th><th>移動元</th><th>移動先</th><th>資材</th><th>数量</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 function demoData() {
   // config.jsの車両・資材リストからデモ用の報告データを作る
   // （定数どおり／不足／ゼロ／昨日報告、を順番に混ぜる。最後の車両は未報告のまま残す）
@@ -248,6 +269,7 @@ async function refresh() {
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || "サーバーエラー");
     render(json.vehicles || []);
+    renderHistory(json.movements || []);
     errBar.style.display = "none";
     const now = new Date();
     status.textContent = "最終更新 " +

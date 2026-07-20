@@ -90,10 +90,19 @@ function doPost(e) {
 // ダッシュボード用：車両ごとの最新報告をJSONで返す
 function doGet() {
   try {
-    return jsonOutput({ ok: true, vehicles: getLatestReports() });
+    return jsonOutput({ ok: true, vehicles: getLatestReports(), movements: getMovementHistory() });
   } catch (err) {
     return jsonOutput({ ok: false, error: String(err) });
   }
+}
+
+function getMovementHistory() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECORD);
+  return sheet.getDataRange().getValues().slice(1)
+    .filter((r) => r[4] && r[4] !== "棚卸し")
+    .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+    .slice(0, 100)
+    .map((r) => ({ time: new Date(r[0]).toISOString(), type: String(r[4]), item: String(r[5]), qty: Number(r[6]), from: String(r[7] || ""), to: String(r[8] || ""), name: String(r[2] || "") }));
 }
 
 // 記録シートから車両ごとの最新報告を組み立てる
