@@ -199,6 +199,8 @@
   <!-- 入力画面 -->
   <div id="form-screen">
     <div id="route-card" class="card route-card active">
+      <label class="field-label" for="reporter-name">報告者名</label>
+      <input id="reporter-name" type="text" placeholder="例：山田太郎" autocomplete="name" style="width:100%;padding:12px;font-size:16px;border:1.5px solid #d0d5dd;border-radius:10px;margin-bottom:12px;">
       <label class="field-label">移動ルート</label>
       <div class="route-line">
         <select id="movement-from" aria-label="移動元"></select>
@@ -267,12 +269,14 @@ function closeApp() {
 
 async function submitReport() {
   const btn = document.getElementById("submit-btn");
+  const reporterName = document.getElementById("reporter-name").value.trim();
   const note = document.getElementById("note").value.trim();
 
   const from = document.getElementById("movement-from").value;
   const to = document.getElementById("movement-to").value;
   const changeType = from === "新規" ? "new" : to === "廃棄" ? "dispose" : "move";
   const vehicle = changeType === "dispose" ? from : to;
+  if (!reporterName) { showError("報告者名を入力してください"); return; }
   const items = {};
   for (let i = 0; i < CONFIG.ITEMS.length; i++) {
     const v = parseInt(document.getElementById("change-qty-" + i).value, 10);
@@ -295,7 +299,7 @@ async function submitReport() {
     const res = await fetch(CONFIG.GAS_URL, {
       method: "POST",
       body: JSON.stringify({  // ヘッダー無し(text/plain)でCORSプリフライトを回避
-        name: profile.displayName,
+        name: reporterName,
         userId: profile.userId,
         vehicle: vehicle,
         items: items,
@@ -309,6 +313,7 @@ async function submitReport() {
     if (!json.ok) throw new Error(json.error || "サーバーエラー");
 
     localStorage.setItem("lastVehicle", vehicle);
+    localStorage.setItem("reporterName", reporterName);
     document.getElementById("done-detail").textContent =
       vehicle + "\n" +
       CONFIG.ITEMS.map((it) => `${it.name}：${items[it.name]}`).join("　");
@@ -325,6 +330,7 @@ async function submitReport() {
 
 async function submitInventory() {
   const vehicle = document.getElementById("inventory-vehicle").value;
+  const reporterName = document.getElementById("reporter-name").value.trim();
   const items = {};
   for (let i = 0; i < CONFIG.ITEMS.length; i++) {
     const v = parseInt(document.getElementById("inventory-qty-" + i).value, 10);
@@ -333,12 +339,14 @@ async function submitInventory() {
   }
   if (!CONFIG.GAS_URL) { showError("GAS_URLが未設定です（config.js）"); return; }
   try {
+    if (!reporterName) { showError("報告者名を入力してください"); return; }
     const res = await fetch(CONFIG.GAS_URL, { method: "POST", body: JSON.stringify({
-      mode: "inventory", name: profile.displayName, userId: profile.userId, vehicle: vehicle, items: items,
+      mode: "inventory", name: reporterName, userId: profile.userId, vehicle: vehicle, items: items,
     }) });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || "サーバーエラー");
     document.getElementById("inventory-modal").classList.remove("active");
+    localStorage.setItem("reporterName", reporterName);
     document.getElementById("done-detail").textContent = vehicle + "\n棚卸しを更新しました";
     document.getElementById("form-screen").style.display = "none";
     document.getElementById("done-screen").style.display = "block";
@@ -346,6 +354,16 @@ async function submitInventory() {
 }
 
 async function init() {
+  if (CONFIG.GAS_URL) {
+    try {
+      const masterRes = await fetch(CONFIG.GAS_URL + "?masters=" + Date.now());
+      const masterJson = await masterRes.json();
+      if (Array.isArray(masterJson.vehicleMaster) && masterJson.vehicleMaster.length) {
+        CONFIG.VEHICLES = masterJson.vehicleMaster;
+      }
+    } catch (_) { /* マスタ取得失敗時はconfig.jsの車両を使う */ }
+  }
+  document.getElementById("reporter-name").value = localStorage.getItem("reporterName") || profile.displayName || "";
   // 車両リスト（前回選んだ車両を初期選択）
   const last = localStorage.getItem("lastVehicle");
   const requestedVehicle = new URLSearchParams(window.location.search).get("vehicle");

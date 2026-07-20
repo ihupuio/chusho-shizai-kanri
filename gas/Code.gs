@@ -108,10 +108,27 @@ function doPost(e) {
 // ダッシュボード用：車両ごとの最新報告をJSONで返す
 function doGet() {
   try {
-    return jsonOutput({ ok: true, vehicles: getLatestReports(), movements: getMovementHistory() });
+    return jsonOutput({ ok: true, vehicles: getLatestReports(), movements: getMovementHistory(), vehicleMaster: getVehicleMaster(), workerMaster: getWorkerMaster() });
   } catch (err) {
     return jsonOutput({ ok: false, error: String(err) });
   }
+}
+
+function getVehicleMaster() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_VEHICLES);
+  if (!sheet) return [];
+  return sheet.getDataRange().getValues().slice(1)
+    .filter((r) => r[0] && String(r[1] || "使用中") === "使用中")
+    .sort((a, b) => Number(a[2] || 0) - Number(b[2] || 0))
+    .map((r) => String(r[0]));
+}
+
+function getWorkerMaster() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_WORKERS);
+  if (!sheet) return [];
+  return sheet.getDataRange().getValues().slice(1)
+    .filter((r) => r[0] && String(r[2] || "有効") !== "無効")
+    .map((r) => ({ name: String(r[0]), lineName: String(r[1] || "") }));
 }
 
 function getMovementHistory() {
