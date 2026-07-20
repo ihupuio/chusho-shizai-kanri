@@ -198,11 +198,6 @@
 
   <!-- 入力画面 -->
   <div id="form-screen">
-    <div class="card">
-      <label class="field-label" for="vehicle">車両</label>
-      <select id="vehicle"></select>
-    </div>
-
     <div id="route-card" class="card route-card">
       <label class="field-label">移動ルート</label>
       <div class="route-line">
@@ -246,6 +241,8 @@
   <div class="modal">
     <h2 id="inventory-title">棚卸し（現在庫）</h2>
     <div class="modal-help">車両に現在ある数を入力して、現在庫を更新します。</div>
+    <label class="field-label" for="inventory-vehicle">車両</label>
+    <select id="inventory-vehicle"></select>
     <div id="inventory-list"></div>
     <div class="modal-actions">
       <button type="button" id="inventory-cancel">キャンセル</button>
@@ -279,12 +276,12 @@ function closeApp() {
 
 async function submitReport() {
   const btn = document.getElementById("submit-btn");
-  const vehicle = document.getElementById("vehicle").value;
+  const changeType = document.getElementById("change-type").value;
   const note = document.getElementById("note").value.trim();
 
-  const changeType = document.getElementById("change-type").value;
   const from = document.getElementById("movement-from").value;
   const to = document.getElementById("movement-to").value;
+  const vehicle = changeType === "dispose" ? from : to;
   const items = {};
   for (let i = 0; i < CONFIG.ITEMS.length; i++) {
     const v = parseInt(document.getElementById("change-qty-" + i).value, 10);
@@ -336,7 +333,7 @@ async function submitReport() {
 }
 
 async function submitInventory() {
-  const vehicle = document.getElementById("vehicle").value;
+  const vehicle = document.getElementById("inventory-vehicle").value;
   const items = {};
   for (let i = 0; i < CONFIG.ITEMS.length; i++) {
     const v = parseInt(document.getElementById("inventory-qty-" + i).value, 10);
@@ -359,17 +356,9 @@ async function submitInventory() {
 
 async function init() {
   // 車両リスト（前回選んだ車両を初期選択）
-  const sel = document.getElementById("vehicle");
   const last = localStorage.getItem("lastVehicle");
   const requestedVehicle = new URLSearchParams(window.location.search).get("vehicle");
   const initialVehicle = CONFIG.VEHICLES.includes(requestedVehicle) ? requestedVehicle : last;
-  CONFIG.VEHICLES.forEach((name) => {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    if (name === initialVehicle) opt.selected = true;
-    sel.appendChild(opt);
-  });
 
   const makeOptions = (includeWaste) => {
     const values = ["倉庫"].concat(CONFIG.VEHICLES);
@@ -378,16 +367,17 @@ async function init() {
   };
   document.getElementById("movement-from").innerHTML = makeOptions(true);
   document.getElementById("movement-to").innerHTML = makeOptions(true);
-  document.getElementById("movement-to").value = CONFIG.VEHICLES[0] || "";
+  document.getElementById("movement-to").value = initialVehicle || CONFIG.VEHICLES[0] || "";
   document.getElementById("movement-from").value = "倉庫";
+  const inventoryVehicle = document.getElementById("inventory-vehicle");
+  inventoryVehicle.innerHTML = CONFIG.VEHICLES.map((name) => `<option value="${name}">${name}</option>`).join("");
+  inventoryVehicle.value = initialVehicle || CONFIG.VEHICLES[0] || "";
 
   const list = document.getElementById("change-list");
   const inventoryList = document.getElementById("inventory-list");
   CONFIG.ITEMS.forEach((it, i) => {
     const row = `<div class="item-row"><div class="item-name">${it.name}</div>` +
-      `<button type="button" onclick="step('change',${i},-1)">−</button>` +
-      `<input type="number" id="change-qty-${i}" value="0" min="0" inputmode="numeric">` +
-      `<button type="button" onclick="step('change',${i},1)">＋</button></div>`;
+      `<input type="number" id="change-qty-${i}" value="0" min="0" inputmode="numeric"></div>`;
     list.insertAdjacentHTML("beforeend", row);
     inventoryList.insertAdjacentHTML("beforeend", row.replace(/change-qty/g, "inventory-qty").replace(/step\('change'/g, "step('inventory'"));
   });
@@ -402,15 +392,14 @@ async function init() {
     toEl.disabled = type !== "move";
     if (type === "new") {
       fromEl.value = "倉庫";
-      toEl.value = document.getElementById("vehicle").value;
+      toEl.value = toEl.value === "倉庫" || toEl.value === "廃棄" ? (initialVehicle || CONFIG.VEHICLES[0] || "") : toEl.value;
     }
     if (type === "dispose") {
-      fromEl.value = document.getElementById("vehicle").value;
+      fromEl.value = fromEl.value === "倉庫" || fromEl.value === "廃棄" ? (initialVehicle || CONFIG.VEHICLES[0] || "") : fromEl.value;
       toEl.value = "廃棄";
     }
   };
   document.getElementById("change-type").addEventListener("change", updateMovementFields);
-  document.getElementById("vehicle").addEventListener("change", updateMovementFields);
   updateMovementFields();
   document.getElementById("inventory-open").addEventListener("click", () => document.getElementById("inventory-modal").classList.add("active"));
   document.getElementById("inventory-cancel").addEventListener("click", () => document.getElementById("inventory-modal").classList.remove("active"));
