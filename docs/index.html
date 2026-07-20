@@ -120,6 +120,19 @@
     font-size: 12px;
     margin-bottom: 4px;
   }
+  .movement-fields { display: none; margin-top: 12px; }
+  .movement-fields.active { display: block; }
+  .movement-fields label { display: block; font-size: 12px; color: #667085; margin: 8px 0 4px; }
+  .inventory-open { float: right; border: none; background: none; color: #1570ef; font-size: 12px; padding: 4px 0; }
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(16,24,40,.45); z-index: 10; padding: 24px 16px; }
+  .modal-backdrop.active { display: block; }
+  .modal { max-width: 480px; margin: 10vh auto 0; background: #fff; border-radius: 14px; padding: 18px; box-shadow: 0 8px 24px rgba(16,24,40,.2); }
+  .modal h2 { font-size: 18px; margin-bottom: 6px; }
+  .modal-help { font-size: 12px; color: #667085; margin-bottom: 8px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .modal-actions button { flex: 1; padding: 12px; border-radius: 10px; font-weight: 700; }
+  #inventory-cancel { border: 1px solid #d0d5dd; background: #fff; }
+  #inventory-save { border: none; background: #06c755; color: #fff; }
   #submit-btn {
     width: 100%;
     padding: 16px 0;
@@ -186,19 +199,22 @@
     </div>
 
     <div class="card">
-      <label class="field-label">車両に積んでいる資材の数</label>
-      <div class="tabs" role="tablist" aria-label="資材入力の種類">
-        <button type="button" class="tab-btn active" data-panel="inventory-panel" role="tab" aria-selected="true">棚卸し（現在庫）</button>
-        <button type="button" class="tab-btn" data-panel="load-panel" role="tab" aria-selected="false">新たに積んだ数</button>
+      <label class="field-label" for="change-type">変更内容</label>
+      <select id="change-type">
+        <option value="new">新規</option>
+        <option value="move">移動</option>
+        <option value="dispose">廃棄</option>
+      </select>
+      <div class="panel-help">今回増減した数を入力してください。</div>
+      <div id="change-list"></div>
+      <div id="movement-fields" class="movement-fields">
+        <label for="movement-from">移動元</label>
+        <select id="movement-from"></select>
+        <label for="movement-to">移動先</label>
+        <select id="movement-to"></select>
       </div>
-      <div id="inventory-panel" class="item-panel active" role="tabpanel">
-        <div class="panel-help">車両に現在ある数を入力してください。</div>
-        <div id="inventory-list"></div>
-      </div>
-      <div id="load-panel" class="item-panel" role="tabpanel">
-        <div class="panel-help">今回、新たに積み込んだ数を入力してください。棚卸し数に加算されます。</div>
-        <div id="load-list"></div>
-      </div>
+      <button type="button" class="inventory-open" id="inventory-open">棚卸しはこちら</button>
+      <div style="clear:both"></div>
     </div>
 
     <div class="card">
@@ -215,6 +231,18 @@
     <h2>報告しました</h2>
     <div id="done-detail"></div>
     <button id="close-btn" onclick="closeApp()">閉じる</button>
+  </div>
+</div>
+
+<div id="inventory-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
+  <div class="modal">
+    <h2 id="inventory-title">棚卸し（現在庫）</h2>
+    <div class="modal-help">車両に現在ある数を入力して、現在庫を更新します。</div>
+    <div id="inventory-list"></div>
+    <div class="modal-actions">
+      <button type="button" id="inventory-cancel">キャンセル</button>
+      <button type="button" id="inventory-save">現在庫を保存</button>
+    </div>
   </div>
 </div>
 
@@ -246,21 +274,21 @@ async function submitReport() {
   const vehicle = document.getElementById("vehicle").value;
   const note = document.getElementById("note").value.trim();
 
-  const inventory = {};
-  const loaded = {};
+  const changeType = document.getElementById("change-type").value;
+  const from = document.getElementById("movement-from").value;
+  const to = document.getElementById("movement-to").value;
   const items = {};
   for (let i = 0; i < CONFIG.ITEMS.length; i++) {
-    const stock = parseInt(document.getElementById("inventory-qty-" + i).value, 10);
-    const load = parseInt(document.getElementById("load-qty-" + i).value, 10);
-    if (isNaN(stock) || stock < 0 || isNaN(load) || load < 0) {
+    const v = parseInt(document.getElementById("change-qty-" + i).value, 10);
+    if (isNaN(v) || v <= 0) {
       showError(`「${CONFIG.ITEMS[i].name}」の数量を確認してください`);
       return;
     }
-    inventory[CONFIG.ITEMS[i].name] = stock;
-    loaded[CONFIG.ITEMS[i].name] = load;
-    items[CONFIG.ITEMS[i].name] = stock + load;
+    items[CONFIG.ITEMS[i].name] = v;
   }
   if (!vehicle) { showError("車両を選択してください"); return; }
+  if (changeType === "move" && (!from || !to || from === to)) { showError("移動元と移動先を確認してください"); return; }
+  if (changeType === "dispose" && !from) { showError("廃棄元を確認してください"); return; }
   if (!CONFIG.GAS_URL) { showError("GAS_URLが未設定です（config.js）"); return; }
 
   document.getElementById("error-msg").style.display = "none";
@@ -275,6 +303,9 @@ async function submitReport() {
         userId: profile.userId,
         vehicle: vehicle,
         items: items,
+        changeType: changeType,
+        from: from,
+        to: to,
         note: note,
       }),
     });
@@ -284,7 +315,7 @@ async function submitReport() {
     localStorage.setItem("lastVehicle", vehicle);
     document.getElementById("done-detail").textContent =
       vehicle + "\n" +
-      CONFIG.ITEMS.map((it) => `${it.name}：${items[it.name]}（棚卸し${inventory[it.name]}＋積込${loaded[it.name]}）`).join("　");
+      CONFIG.ITEMS.map((it) => `${it.name}：${items[it.name]}`).join("　");
     document.getElementById("form-screen").style.display = "none";
     document.getElementById("done-screen").style.display = "block";
     window.scrollTo(0, 0);
@@ -294,6 +325,28 @@ async function submitReport() {
     btn.disabled = false;
     btn.textContent = "この内容で報告する";
   }
+}
+
+async function submitInventory() {
+  const vehicle = document.getElementById("vehicle").value;
+  const items = {};
+  for (let i = 0; i < CONFIG.ITEMS.length; i++) {
+    const v = parseInt(document.getElementById("inventory-qty-" + i).value, 10);
+    if (isNaN(v) || v < 0) { showError(`「${CONFIG.ITEMS[i].name}」の数量を確認してください`); return; }
+    items[CONFIG.ITEMS[i].name] = v;
+  }
+  if (!CONFIG.GAS_URL) { showError("GAS_URLが未設定です（config.js）"); return; }
+  try {
+    const res = await fetch(CONFIG.GAS_URL, { method: "POST", body: JSON.stringify({
+      mode: "inventory", name: profile.displayName, userId: profile.userId, vehicle: vehicle, items: items,
+    }) });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "サーバーエラー");
+    document.getElementById("inventory-modal").classList.remove("active");
+    document.getElementById("done-detail").textContent = vehicle + "\n棚卸しを更新しました";
+    document.getElementById("form-screen").style.display = "none";
+    document.getElementById("done-screen").style.display = "block";
+  } catch (e) { showError("棚卸しの保存に失敗しました。（" + e.message + "）"); }
 }
 
 async function init() {
@@ -310,34 +363,41 @@ async function init() {
     sel.appendChild(opt);
   });
 
-  // 棚卸し・積み込みの数量入力行
-  ["inventory", "load"].forEach((kind) => {
-    const list = document.getElementById(kind + "-list");
-    CONFIG.ITEMS.forEach((it, i) => {
-      const row = document.createElement("div");
-      row.className = "item-row";
-      row.innerHTML =
-        `<div class="item-name">${it.name}` +
-        (it.std > 0 ? `<span class="item-std">定数 ${it.std}</span>` : "") +
-        `</div>` +
-        `<button type="button" onclick="step('${kind}',${i},-1)">−</button>` +
-        `<input type="number" id="${kind}-qty-${i}" value="0" min="0" inputmode="numeric">` +
-        `<button type="button" onclick="step('${kind}',${i},1)">＋</button>`;
-      list.appendChild(row);
-    });
+  const makeOptions = (includeWaste) => {
+    const values = ["倉庫"].concat(CONFIG.VEHICLES);
+    if (includeWaste) values.push("廃棄");
+    return values.map((v) => `<option value="${v}">${v}</option>`).join("");
+  };
+  document.getElementById("movement-from").innerHTML = makeOptions(true);
+  document.getElementById("movement-to").innerHTML = makeOptions(true);
+  document.getElementById("movement-to").value = CONFIG.VEHICLES[0] || "";
+  document.getElementById("movement-from").value = "倉庫";
+
+  const list = document.getElementById("change-list");
+  const inventoryList = document.getElementById("inventory-list");
+  CONFIG.ITEMS.forEach((it, i) => {
+    const row = `<div class="item-row"><div class="item-name">${it.name}</div>` +
+      `<button type="button" onclick="step('change',${i},-1)">−</button>` +
+      `<input type="number" id="change-qty-${i}" value="0" min="0" inputmode="numeric">` +
+      `<button type="button" onclick="step('change',${i},1)">＋</button></div>`;
+    list.insertAdjacentHTML("beforeend", row);
+    inventoryList.insertAdjacentHTML("beforeend", row.replace(/change-qty/g, "inventory-qty").replace(/step\('change'/g, "step('inventory'"));
   });
 
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => {
-        b.classList.toggle("active", b === btn);
-        b.setAttribute("aria-selected", b === btn ? "true" : "false");
-      });
-      document.querySelectorAll(".item-panel").forEach((panel) => {
-        panel.classList.toggle("active", panel.id === btn.dataset.panel);
-      });
-    });
-  });
+  const updateMovementFields = () => {
+    const type = document.getElementById("change-type").value;
+    const fields = document.getElementById("movement-fields");
+    fields.classList.toggle("active", type !== "new");
+    document.getElementById("movement-from").disabled = type === "new";
+    document.getElementById("movement-to").disabled = type !== "move";
+    if (type === "dispose") document.getElementById("movement-from").value = document.getElementById("vehicle").value;
+  };
+  document.getElementById("change-type").addEventListener("change", updateMovementFields);
+  document.getElementById("vehicle").addEventListener("change", updateMovementFields);
+  updateMovementFields();
+  document.getElementById("inventory-open").addEventListener("click", () => document.getElementById("inventory-modal").classList.add("active"));
+  document.getElementById("inventory-cancel").addEventListener("click", () => document.getElementById("inventory-modal").classList.remove("active"));
+  document.getElementById("inventory-save").addEventListener("click", () => submitInventory());
 
   if (!CONFIG.LIFF_ID) {
     // デモモード：LINEなしで動作確認用

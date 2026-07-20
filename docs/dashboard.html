@@ -184,7 +184,9 @@ function render(reports) {
     } else {
       html += `<div class="v-meta">` +
         (t ? `<span class="${t.stale ? "warn" : ""}">${t.stale ? "⚠ " : ""}${t.text}</span>` : "") +
-        (r.name ? `　${r.name}` : "") + `</div>`;
+        (r.name ? `　${r.name}` : "") +
+        (r.changeType ? `<br><span>${r.changeType}${r.from || r.to ? `：${r.from || ""}→${r.to || ""}` : ""}</span>` : "") +
+        `</div>`;
       if (CONFIG.ITEMS.length === 1) {
         // 1品目だけなら数字を大きく表示
         const it = CONFIG.ITEMS[0];

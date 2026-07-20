@@ -24,8 +24,8 @@ function setup() {
   let rec = ss.getSheetByName(SHEET_RECORD);
   if (!rec) {
     rec = ss.insertSheet(SHEET_RECORD);
-    rec.getRange(1, 1, 1, 8).setValues([
-      ["日時", "報告ID", "氏名", "LINE UserID", "車両", "資材", "数量", "備考"],
+    rec.getRange(1, 1, 1, 11).setValues([
+      ["日時", "報告ID", "氏名", "LINE UserID", "種別", "資材", "変更数", "移動元", "移動先", "車両", "備考"],
     ]);
     rec.setFrozenRows(1);
   }
@@ -46,8 +46,11 @@ function doPost(e) {
     }
     for (const k in data.items) {
       const v = Number(data.items[k]);
-      if (isNaN(v) || v < 0) return jsonOutput({ ok: false, error: "数量が不正です：" + k });
+      if (isNaN(v) || v < 0 || (data.mode !== "inventory" && v === 0)) return jsonOutput({ ok: false, error: "数量が不正です：" + k });
     }
+    const type = data.mode === "inventory" ? "棚卸し" : ({ new: "新規", move: "移動", dispose: "廃棄" }[data.changeType] || "新規");
+    if (type === "移動" && (!data.from || !data.to || data.from === data.to)) return jsonOutput({ ok: false, error: "移動元と移動先が不正です" });
+    if (type === "廃棄" && !data.from) return jsonOutput({ ok: false, error: "廃棄元が未指定です" });
 
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
@@ -63,12 +66,15 @@ function doPost(e) {
         reportId,
         String(data.name || ""),
         String(data.userId || ""),
-        String(data.vehicle),
+        type,
         item,
         Number(data.items[item]),
+        String(data.from || (type === "新規" ? "倉庫" : "")),
+        String(data.to || (type === "新規" ? data.vehicle : type === "廃棄" ? "廃棄" : "")),
+        String(data.vehicle),
         String(data.note || ""),
       ]);
-      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 8).setValues(rows);
+      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 11).setValues(rows);
 
       updateLatestSheet();
     } finally {
@@ -94,28 +100,21 @@ function doGet() {
 function getLatestReports() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECORD);
   const values = sheet.getDataRange().getValues().slice(1);
-  const byVehicle = {};
-
-  values.forEach((r) => {
-    const [time, reportId, name, userId, vehicle, item, qty, note] = r;
-    if (!vehicle || !item) return;
-    const cur = byVehicle[vehicle];
-    if (!cur || cur.reportId !== reportId) {
-      // 新しい報告IDの行が来たら、より新しい場合のみ置き換える
-      if (cur && new Date(time) < new Date(cur.time)) return;
-      byVehicle[vehicle] = {
-        vehicle: String(vehicle),
-        reportId: reportId,
-        time: new Date(time).toISOString(),
-        name: String(name || ""),
-        note: String(note || ""),
-        items: {},
-      };
-    }
-    byVehicle[vehicle].items[String(item)] = Number(qty);
+  const stock = {};
+  const latest = {};
+  values.sort((a, b) => new Date(a[0]) - new Date(b[0])).forEach((r) => {
+    const [time, reportId, name, userId, type, item, qty, from, to, vehicle, note] = r;
+    if (!item || !type) return;
+    const n = Number(qty) || 0;
+    const ensure = (v) => { if (v && v !== "倉庫" && v !== "廃棄") { stock[v] = stock[v] || {}; stock[v][item] = Number(stock[v][item] || 0); } };
+    if (type === "棚卸し") { ensure(vehicle); stock[vehicle][item] = n; }
+    if (type === "新規") { ensure(to || vehicle); stock[to || vehicle][item] += n; }
+    if (type === "移動") { ensure(from); ensure(to); if (from && from !== "倉庫") stock[from][item] -= n; if (to && to !== "廃棄") stock[to][item] += n; }
+    if (type === "廃棄") { ensure(from || vehicle); if ((from || vehicle) !== "倉庫") stock[from || vehicle][item] -= n; }
+    const affected = [vehicle, from, to].filter((v) => v && v !== "倉庫" && v !== "廃棄");
+    affected.forEach((v) => { latest[v] = { vehicle: v, reportId: reportId, time: new Date(time).toISOString(), name: String(name || ""), note: String(note || ""), changeType: type, from: String(from || ""), to: String(to || ""), items: Object.assign({}, stock[v]) }; });
   });
-
-  return Object.keys(byVehicle).sort().map((v) => byVehicle[v]);
+  return Object.keys(stock).sort().map((v) => Object.assign({ vehicle: v, items: stock[v] }, latest[v] || {}));
 }
 
 // 「最新」シートを車両×資材のマトリクスに書き直す（Googleサイト埋め込み用）
