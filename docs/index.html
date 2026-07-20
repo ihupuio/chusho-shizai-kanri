@@ -361,7 +361,7 @@ async function init() {
   const initialVehicle = CONFIG.VEHICLES.includes(requestedVehicle) ? requestedVehicle : last;
 
   const makeOptions = (includeWaste) => {
-    const values = ["倉庫"].concat(CONFIG.VEHICLES);
+    const values = ["新規", "倉庫"].concat(CONFIG.VEHICLES);
     if (includeWaste) values.push("廃棄");
     return values.map((v) => `<option value="${v}">${v}</option>`).join("");
   };
@@ -391,7 +391,7 @@ async function init() {
     fromEl.disabled = type !== "move";
     toEl.disabled = type !== "move";
     if (type === "new") {
-      fromEl.value = "倉庫";
+      fromEl.value = "新規";
       toEl.value = toEl.value === "倉庫" || toEl.value === "廃棄" ? (initialVehicle || CONFIG.VEHICLES[0] || "") : toEl.value;
     }
     if (type === "dispose") {
