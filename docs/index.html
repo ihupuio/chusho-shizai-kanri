@@ -193,7 +193,7 @@
     <a class="dashboard-link" href="dashboard.html" target="_blank" rel="noopener">ダッシュボードを見る</a>
   </header>
   <div id="user-name"></div>
-  <div class="demo-badge" id="demo-badge">デモモード（LIFF未設定）</div>
+  <div class="demo-badge" id="demo-badge">Webフォーム（LINEログイン不要）</div>
   <div id="error-msg"></div>
 
   <!-- 入力画面 -->
@@ -417,26 +417,8 @@ async function init() {
   document.getElementById("inventory-cancel").addEventListener("click", () => document.getElementById("inventory-modal").classList.remove("active"));
   document.getElementById("inventory-save").addEventListener("click", () => submitInventory());
 
-  if (!CONFIG.LIFF_ID) {
-    // デモモード：LINEなしで動作確認用
-    document.getElementById("demo-badge").style.display = "block";
-    profile = { displayName: "テストユーザー", userId: "demo" };
-    document.getElementById("user-name").textContent = "報告者：" + profile.displayName;
-    return;
-  }
-
-  try {
-    await liff.init({ liffId: CONFIG.LIFF_ID });
-    if (!liff.isLoggedIn()) {
-      liff.login();  // LINEアプリ内なら自動ログイン、外部ブラウザならログイン画面へ
-      return;
-    }
-    const p = await liff.getProfile();
-    profile = { displayName: p.displayName, userId: p.userId };
-    document.getElementById("user-name").textContent = "報告者：" + profile.displayName;
-  } catch (e) {
-    showError("LIFFの初期化に失敗しました：" + e.message);
-  }
+  document.getElementById("demo-badge").style.display = "block";
+  profile = { displayName: "", userId: "web" };
 }
 
 init();
