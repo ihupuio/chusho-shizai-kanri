@@ -2,10 +2,6 @@
 // セットアップ時にここを書き換えるだけでOK
 
 const CONFIG = {
-  // LINE DevelopersでLIFFアプリを登録すると発行されるID（例: "2001234567-AbcdEfgh"）
-  // 空のままだと「デモモード」になり、LINEなしのブラウザで動作確認できます
-  LIFF_ID: "2010766899-wHZg1t0X",
-
   // GASをウェブアプリとしてデプロイしたときのURL（https://script.google.com/macros/s/…/exec）
   GAS_URL: "https://script.google.com/macros/s/AKfycbxI6A0NIRZDhgDf3ajrWO7MuuAYYuEcKWNpdtU57jUs11ir9b59SyRnlVvuRQ94kjWeFg/exec",
 

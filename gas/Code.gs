@@ -28,7 +28,7 @@ function setup() {
   if (!rec) {
     rec = ss.insertSheet(SHEET_RECORD);
     rec.getRange(1, 1, 1, 11).setValues([
-      ["日時", "報告ID", "氏名", "LINE UserID", "種別", "資材", "変更数", "移動元", "移動先", "車両", "備考"],
+      ["日時", "報告ID", "氏名", "外部ID", "種別", "資材", "変更数", "移動元", "移動先", "車両", "備考"],
     ]);
     rec.setFrozenRows(1);
   }
@@ -39,7 +39,7 @@ function setup() {
 
   if (!ss.getSheetByName(SHEET_WORKERS)) {
     const workers = ss.insertSheet(SHEET_WORKERS);
-    workers.getRange(1, 1, 1, 3).setValues([["氏名", "LINE表示名", "有効"]]);
+    workers.getRange(1, 1, 1, 3).setValues([["氏名", "表示名", "有効"]]);
     workers.setFrozenRows(1);
   }
 
@@ -53,7 +53,7 @@ function setup() {
   }
 }
 
-// LIFFフォームからの送信を受け取る
+// Webフォームからの送信を受け取る
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
